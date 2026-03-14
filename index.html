@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CryptoShield AI | Forensic Layer</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;500;700&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vanilla-tilt/1.8.0/vanilla-tilt.min.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #050608;
+            --card-bg: rgba(11, 22, 48, 0.9);
+            --primary-accent: #3b82f6;
+            --primary-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: rgba(59, 130, 246, 0.2);
+            --danger: #ef4444;
+            --success: #10b981;
+            --warning: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            height: 100vh;
+            background-color: var(--bg-color);
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-main);
+            overflow: hidden;
+            perspective: 1200px;
+        }
+
+        #video-bg {
+            position: fixed;
+            right: 0;
+            bottom: 0;
+            min-width: 100%;
+            min-height: 100%;
+            z-index: -2;
+            object-fit: cover;
+            opacity: 0.4;
+        }
+
+        #video-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, rgba(5, 6, 8, 0.5) 0%, rgba(5, 6, 8, 0.95) 100%);
+            z-index: -1;
+        }
+
+        .glass-card {
+            position: relative;
+            z-index: 10;
+            width: 90%;
+            max-width: 550px;
+            background: rgba(11, 22, 48, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 50px 100px -20px rgba(0, 0, 0, 0.8),
+                0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+            overflow-y: auto;
+            max-height: 95vh;
+            transition: max-width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            transform-style: preserve-3d;
+        }
+
+        .glass-card.expanded {
+            max-width: 1200px;
+            text-align: left;
+        }
+
+        .logo-area {
+            transform: translateZ(30px);
+        }
+
+        .logo-area h1 {
+            font-size: 28px;
+            margin: 0;
+            font-weight: 700;
+            background: linear-gradient(to right, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-area p {
+            font-size: 11px;
+            color: var(--primary-accent);
+            opacity: 0.8;
+            margin-top: 5px;
+            font-family: 'JetBrains Mono', monospace;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: var(--primary-accent);
+            box-shadow: 0 0 15px var(--primary-accent), 0 0 30px var(--primary-accent);
+            opacity: 0;
+            z-index: 50;
+            pointer-events: none;
+        }
+
+        .scan-line.active {
+            animation: scanAnim 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+            opacity: 1;
+        }
+
+        @keyframes scanAnim {
+            0% {
+                top: 0;
+                opacity: 0;
+            }
+
+            10% {
+                opacity: 1;
+            }
+
+            90% {
+                opacity: 1;
+            }
+
+            100% {
+                top: 100%;
+                opacity: 0;
+            }
+        }
+
+        #input-section {
+            transform: translateZ(20px);
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 18px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            color: var(--text-main);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            text-align: center;
+            outline: none;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+            margin-top: 30px;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary-accent);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+        }
+
+        .scan-btn {
+            width: 100%;
+            padding: 16px;
+            background: var(--primary-gradient);
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(37, 99, 235, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .scan-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(37, 99, 235, 0.6);
+        }
+
+        .stagger-in {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        .stagger-in.show {
+            animation: slideUpFade 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .delay-1 {
+            animation-delay: 0.1s;
+        }
+
+        .delay-2 {
+            animation-delay: 0.25s;
+        }
+
+        .delay-3 {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes slideUpFade {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .result-section {
+            display: none;
+            margin-top: 30px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 30px;
+            text-align: left;
+            transform: translateZ(20px);
+        }
+
+        .result-grid {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 40px;
+        }
+
+        @media (max-width: 800px) {
+            .result-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 200px;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .chart-center-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -40%);
+            text-align: center;
+        }
+
+        .chart-number {
+            font-size: 42px;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', monospace;
+            line-height: 1;
+            display: block;
+        }
+
+        .chart-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .analysis-box {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+            transition: all 0.3s;
+        }
+
+        .action-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .secondary-btn {
+            padding: 12px;
+            border-radius: 8px;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            flex: 1;
+            transition: all 0.3s;
+        }
+
+        .secondary-btn:hover {
+            border-color: var(--primary-accent);
+            color: #fff;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 100;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal {
+            background: #0f172a;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 50px 100px -20px black;
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-body {
+            padding: 0;
+            overflow-y: auto;
+        }
+
+        .tx-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .tx-table th {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 12px;
+            text-align: left;
+            color: var(--text-muted);
+            position: sticky;
+            top: 0;
+        }
+
+        .tx-table td {
+            padding: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+        }
+
+        .tx-table tr:hover {
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .tag-in {
+            color: var(--success);
+        }
+
+        .tag-out {
+            color: var(--danger);
+        }
+
+        /* --- NEW GRAPH STYLES --- */
+        .graph-loader {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--primary-accent);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+        }
+
+        .radar-spinner {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid rgba(59, 130, 246, 0.2);
+            border-top-color: var(--primary-accent);
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        #graph-tooltip {
+            position: absolute;
+            display: none;
+            background: rgba(11, 22, 48, 0.95);
+            border: 1px solid var(--primary-accent);
+            padding: 10px 15px;
+            border-radius: 8px;
+            color: #fff;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            pointer-events: none;
+            z-index: 1000;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(4px);
+            transform: translate(-50%, -120%);
+        }
+
+        .tooltip-label {
+            color: var(--text-muted);
+            display: block;
+            margin-bottom: 4px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <video id="video-bg" autoplay muted loop playsinline>
+        <source src="/static/bg3-video.mp4.mp4" type="video/mp4">
+    </video>
+    <div id="video-overlay"></div>
+
+    <div class="glass-card" id="mainCard">
+        <div class="scan-line" id="scannerLine"></div>
+
+        <div class="logo-area">
+            <h1>CryptoShield.AI</h1>
+            <p>Gemini Powered Forensics</p>
+            <div id="network-badge"
+                style="display:none; margin-top:5px; font-size:10px; padding:2px 8px; border-radius:4px; background:rgba(255,255,255,0.1); display:inline-block;">
+                DETECTED: <span id="network-name" style="font-weight:bold; color:#fff;">ETH</span>
+            </div>
+        </div>
+
+        <div id="input-section">
+            <input type="text" id="walletInput" placeholder="Enter Wallet Address (0x...)" spellcheck="false">
+            <button class="scan-btn" onclick="startScan()">Analyze Wallet</button>
+            <p style="font-size: 11px; color: var(--text-muted); cursor: pointer; margin-top: 15px; opacity: 0.6;"
+                onclick="fillDemo()">[ LOAD DEMO DATA ]</p>
+            <div id="scan-status"
+                style="margin-top: 15px; font-family: 'JetBrains Mono'; font-size: 11px; color: var(--primary-accent); min-height:15px;">
+            </div>
+        </div>
+
+        <div id="result-section" class="result-section">
+            <div class="result-grid">
+
+                <div class="col-left stagger-in delay-1" id="anim-left">
+                    <div class="chart-wrapper">
+                        <canvas id="riskChart"></canvas>
+                        <div class="chart-center-text">
+                            <span class="chart-number" id="chartScore">0</span>
+                            <span class="chart-label">RISK SCORE</span>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div class="analysis-box" style="margin:0; text-align:center; padding: 10px;">
+                            <span style="font-size:10px; display:block; color:var(--text-muted);">TX COUNT</span>
+                            <strong id="txCount" style="font-size:16px;">0</strong>
+                        </div>
+                        <div class="analysis-box" style="margin:0; text-align:center; padding: 10px;">
+                            <span style="font-size:10px; display:block; color:var(--text-muted);">VOLUME</span>
+                            <strong id="volumeVal" style="font-size:16px;">0</strong><span id="volCurrency"
+                                style="font-size: 10px; margin-left:2px;"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-right stagger-in delay-2" id="anim-right">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                        <h3 style="margin:0; font-size:16px; color:var(--text-main);">AI Assessment</h3>
+                        <span id="riskBadge"
+                            style="padding: 5px 10px; border-radius:6px; font-size:11px; font-weight:bold; background:#333;">ANALYZING</span>
+                    </div>
+
+                    <div class="analysis-box" id="analysisText">Waiting for Gemini analysis...</div>
+
+                    <div id="peelingAlert"
+                        style="display:none; background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #fca5a5; padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 12px; text-align: left;">
+                        <strong>⚠️ STRUCTURING DETECTED</strong><br>"Peeling Chain" pattern found: High frequency split
+                        transactions detected.
+                    </div>
+
+                    <div id="communityAlert"
+                        style="display:none; background: rgba(59, 130, 246, 0.2); border: 1px solid #3b82f6; color: #93c5fd; padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 12px; text-align: left;">
+                        <strong>🛡️ COMMUNITY ALERT</strong><br>This address has been reported by the community as
+                        dangerous.
+                    </div>
+
+                    <div class="action-row stagger-in delay-3" id="anim-actions">
+                        <button class="secondary-btn" onclick="reportAddress()"
+                            style="border-color: #ef4444; color: #ef4444;">REPORT SCAM</button>
+                        <button class="secondary-btn" onclick="showTransactions()">VIEW HISTORY</button>
+                        <button class="secondary-btn" onclick="loadGraph()"
+                            style="border-color: var(--primary-accent); color: var(--primary-accent);">VISUAL
+                            GRAPH</button>
+                        <button class="secondary-btn" onclick="openEtherscan()">EXPLORER</button>
+                        <button class="secondary-btn" onclick="reset()">NEW SCAN</button>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Full-width graph area below the result grid -->
+            <div style="position: relative; margin-top: 0;">
+                <div id="cy"
+                    style="width: 100%; height: 700px; display: none; margin-top: 24px; border: 1px solid var(--border-color); border-radius: 16px; background: rgba(0,0,0,0.55); overflow: hidden; box-shadow: 0 0 40px rgba(59,130,246,0.08);">
+                </div>
+                <div id="graph-tooltip"></div>
+            </div>
+        </div><!-- /result-section -->
+    </div><!-- /glass-card -->
+
+    <div class="modal-overlay" id="txModal">
+        <div class="modal">
+            <div class="modal-header">
+                <span style="font-weight:bold;">Transaction History</span>
+                <button onclick="closeModal()"
+                    style="background:none; border:none; color:white; cursor:pointer;">✕</button>
+            </div>
+            <div class="modal-body">
+                <table class="tx-table">
+                    <thead>
+                        <tr>
+                            <th>Hash</th>
+                            <th>Age</th>
+                            <th>From/To</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody id="txTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="reportModal">
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <span style="font-weight:bold;">Report Scam Address</span>
+                <button onclick="closeReportModal()"
+                    style="background:none; border:none; color:white; cursor:pointer;">✕</button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <p style="margin-bottom: 15px; font-size: 14px; color: var(--text-muted);">
+                    Please provide details about why you are reporting this address. Our AI will verify the claim.
+                </p>
+                <div style="margin-bottom: 15px;">
+                    <label style="display:block; margin-bottom: 5px; font-size: 12px; color: var(--text-muted);">Scam Type</label>
+                    <select id="reportScamType" style="width: 100%; padding: 12px; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-main); font-family: 'Inter', sans-serif;">
+                        <option value="Phishing">Phishing</option>
+                        <option value="Rug Pull">Rug Pull</option>
+                        <option value="Honeypot">Honeypot</option>
+                        <option value="Exploit/Hack">Exploit/Hack</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label style="display:block; margin-bottom: 5px; font-size: 12px; color: var(--text-muted);">Description (min 10 chars)</label>
+                    <textarea id="reportDescription" rows="4" style="width: 100%; padding: 12px; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-main); font-family: 'Inter', sans-serif; resize: vertical;" placeholder="Explain the suspicious activity..."></textarea>
+                </div>
+                <button class="scan-btn" onclick="submitReport()" style="margin-top: 10px; background: var(--danger); box-shadow: 0 4px 20px rgba(239, 68, 68, 0.4);">SUBMIT REPORT</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        VanillaTilt.init(document.getElementById("mainCard"), { max: 3, speed: 400, glare: true, "max-glare": 0.05, gyroscope: true });
+
+        const card = document.getElementById('mainCard');
+        const statusEl = document.getElementById('scan-status');
+        const scannerLine = document.getElementById('scannerLine');
+        let currentTxData = [];
+        let currentChain = "ETH";
+        let riskChart = null;
+
+        function animateValue(obj, start, end, duration, isFloat = false) {
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                const ease = 1 - Math.pow(1 - progress, 4);
+                let current = start + (end - start) * ease;
+                obj.innerText = isFloat ? current.toFixed(2) : Math.floor(current);
+                if (progress < 1) window.requestAnimationFrame(step);
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        async function startScan() {
+            const input = document.getElementById('walletInput').value.trim();
+            if (input.length < 10) return;
+
+            const btn = document.querySelector('.scan-btn');
+            btn.innerHTML = "SCANNING..."; btn.disabled = true;
+            statusEl.innerText = "> Establish secure connection...";
+            scannerLine.classList.add('active');
+
+            try {
+                const isLocal = window.location.protocol === 'file:' || window.location.port === '5500' || window.location.port === '5501';
+                const API_BASE = isLocal ? 'http://127.0.0.1:8001' : '';
+                const response = await fetch(`${API_BASE}/scan?address=${input}`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('crypto_token') || ''}` }
+                });
+                if (!response.ok) throw new Error("API Connection Failed");
+                const data = await response.json();
+
+                scannerLine.classList.remove('active');
+                showResults(data);
+            } catch (e) {
+                scannerLine.classList.remove('active');
+                statusEl.innerText = "Error: " + e.message;
+                btn.disabled = false; btn.innerHTML = "ANALYZE WALLET";
+            }
+        }
+
+        function showResults(data) {
+            currentTxData = data.transactions || [];
+            currentChain = data.chain || "ETH";
+
+            const netBadge = document.getElementById('network-badge');
+            const netName = document.getElementById('network-name');
+            netBadge.style.display = 'inline-block';
+            netName.innerText = currentChain;
+
+            if (currentChain === "POLYGON") {
+                netName.style.color = "#8b5cf6"; document.documentElement.style.setProperty('--primary-accent', '#8b5cf6');
+            } else {
+                netName.style.color = "#3b82f6"; document.documentElement.style.setProperty('--primary-accent', '#3b82f6');
+            }
+
+            card.classList.add('expanded');
+            document.getElementById('input-section').style.display = 'none';
+            document.getElementById('result-section').style.display = 'block';
+
+            setTimeout(() => {
+                document.getElementById('anim-left').classList.add('show');
+                document.getElementById('anim-right').classList.add('show');
+                document.getElementById('anim-actions').classList.add('show');
+            }, 100);
+
+            const txCountVal = parseInt(data.stats.transaction_count) || 0;
+            const volumeVal = parseFloat(data.stats.total_ether_in) || 0;
+            const currency = currentChain === "POLYGON" ? "MATIC" : "ETH";
+
+            document.getElementById('volCurrency').innerText = currency;
+            animateValue(document.getElementById('txCount'), 0, txCountVal, 1500, false);
+            animateValue(document.getElementById('volumeVal'), 0, volumeVal, 1500, true);
+
+            const analysisBox = document.getElementById('analysisText');
+            analysisBox.innerText = data.analysis.explanation;
+            if (data.analysis.explanation.includes("AI Rate Limit") || data.analysis.explanation.includes("System Fallback")) {
+                analysisBox.style.borderLeft = "4px solid var(--warning)"; analysisBox.style.backgroundColor = "rgba(255, 193, 7, 0.1)";
+            } else {
+                analysisBox.style.borderLeft = "none"; analysisBox.style.backgroundColor = "rgba(255,255,255,0.05)";
+            }
+
+            const risk = data.analysis.risk_score;
+            let color = "var(--success)";
+            if (risk > 75) color = "var(--danger)"; else if (risk > 40) color = "var(--warning)";
+
+            const badge = document.getElementById('riskBadge');
+            badge.innerText = data.analysis.risk_level; badge.style.backgroundColor = color; badge.style.color = "#000";
+
+            const chartScoreEl = document.getElementById('chartScore');
+            chartScoreEl.style.color = color;
+            animateValue(chartScoreEl, 0, risk, 1500, false);
+            renderChart(risk, color);
+
+            document.getElementById('peelingAlert').style.display = data.analysis.peeling_chain_detected ? 'block' : 'none';
+            document.getElementById('communityAlert').style.display = data.community_flagged ? 'block' : 'none';
+        }
+
+        function renderChart(risk, colorVar) {
+            const ctx = document.getElementById('riskChart').getContext('2d');
+            if (window.myRiskChart) window.myRiskChart.destroy();
+            const temp = document.createElement('div'); temp.style.color = colorVar; document.body.appendChild(temp);
+            const colorHex = getComputedStyle(temp).color; document.body.removeChild(temp);
+
+            window.myRiskChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: { datasets: [{ data: [risk, 100 - risk], backgroundColor: [colorHex, 'rgba(255,255,255,0.05)'], borderWidth: 0, cutout: '85%', borderRadius: 10 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { tooltip: { enabled: false } }, animation: { animateScale: true } }
+            });
+        }
+
+        function showTransactions() {
+            const tbody = document.getElementById('txTableBody'); tbody.innerHTML = "";
+            const modal = document.getElementById('txModal');
+            if (currentTxData.length === 0) { tbody.innerHTML = "<tr><td colspan='4' style='text-align:center;'>No Transactions Found</td></tr>"; }
+            else {
+                currentTxData.forEach(tx => {
+                    const row = document.createElement('tr'); const isOut = tx.direction === "OUT"; const addr = isOut ? tx.to : tx.from;
+                    const explorerUrl = currentChain === "POLYGON" ? "https://polygonscan.com/tx/" : "https://etherscan.io/tx/";
+                    const currency = currentChain === "POLYGON" ? "MATIC" : "ETH";
+                    row.innerHTML = `<td><a href="${explorerUrl}${tx.hash}" target="_blank" style="color:var(--element-text); opacity:0.7;">${tx.hash.substring(0, 12)}...</a></td>
+                        <td>${new Date(tx.timestamp * 1000).toLocaleDateString()}</td>
+                        <td class="${isOut ? 'tag-out' : 'tag-in'}">${isOut ? 'OUT TO' : 'IN FROM'} ${addr ? addr.substring(0, 8) : 'Unknown'}...</td>
+                        <td>${tx.value} ${currency}</td>`;
+                    tbody.appendChild(row);
+                });
+            }
+            modal.style.display = 'flex';
+        }
+
+        function closeModal() { document.getElementById('txModal').style.display = 'none'; }
+        function fillDemo() { document.getElementById('walletInput').value = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"; }
+        function openEtherscan() {
+            const baseUrl = currentChain === "POLYGON" ? "https://polygonscan.com/address/" : "https://etherscan.io/address/";
+            window.open(`${baseUrl}${document.getElementById('walletInput').value}`, '_blank');
+        }
+        function reset() {
+            card.classList.remove('expanded');
+            document.getElementById('anim-left').classList.remove('show');
+            document.getElementById('anim-right').classList.remove('show');
+            document.getElementById('anim-actions').classList.remove('show');
+
+            document.getElementById('input-section').style.display = 'block';
+            document.getElementById('result-section').style.display = 'none';
+            document.getElementById('walletInput').value = "";
+            document.getElementById('network-badge').style.display = 'none';
+            document.querySelector('.scan-btn').disabled = false;
+            document.querySelector('.scan-btn').innerHTML = "ANALYZE WALLET";
+            statusEl.innerText = ""; document.getElementById('cy').style.display = 'none';
+            currentChain = "ETH"; document.documentElement.style.setProperty('--primary-accent', '#3b82f6');
+        }
+
+        // --- UPDATED LOAD GRAPH WITH VIRUS STYLES & INTERACTIVITY ---
+        async function loadGraph() {
+            const addr = document.getElementById('walletInput').value;
+            const container = document.getElementById('cy');
+            const tooltip = document.getElementById('graph-tooltip');
+
+            if (container.style.display === 'block') {
+                container.style.display = 'none';
+                tooltip.style.display = 'none';
+                return;
+            }
+
+            container.style.display = 'block';
+
+            // Show Radar Loader
+            container.innerHTML = `
+                <div class="graph-loader" id="gLoader" style="display:flex;">
+                    <div class="radar-spinner"></div>
+                    <span>MAPPING FORENSIC NODES...</span>
+                </div>`;
+
+            try {
+                const isLocal = window.location.protocol === 'file:' || window.location.port === '5500' || window.location.port === '5501';
+                const API_BASE = isLocal ? 'http://127.0.0.1:8001' : '';
+                const res = await fetch(`${API_BASE}/graph?address=${addr}&chain=${currentChain}`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('crypto_token') || ''}` }
+                });
+
+                if (!res.ok) { throw new Error("Graph data unavailable"); }
+                const data = await res.json();
+
+                if (!data || !data.nodes) throw new Error("No graph data received.");
+
+                // ---- STEP 1: Fast position computation using concentric rings ----
+                // Build adjacency list and BFS depth map from raw data (no Cytoscape needed)
+                const nodeMap = {};
+                data.nodes.forEach(n => nodeMap[n.id] = n);
+                const adjListPre = {};
+                data.nodes.forEach(n => adjListPre[n.id] = []);
+                data.edges.forEach(e => {
+                    if (adjListPre[e.source]) adjListPre[e.source].push(e.target);
+                    if (adjListPre[e.target]) adjListPre[e.target].push(e.source);
+                });
+                const targetData = data.nodes.find(n => n.type === 'target') || data.nodes[0];
+                const depthOfNode = {};
+                const preQ = [{ id: targetData.id, depth: 0 }];
+                const preSeen = new Set([targetData.id]);
+                while (preQ.length > 0) {
+                    const { id, depth } = preQ.shift();
+                    depthOfNode[id] = depth;
+                    (adjListPre[id] || []).forEach(nbr => {
+                        if (!preSeen.has(nbr)) { preSeen.add(nbr); preQ.push({ id: nbr, depth: depth + 1 }); }
+                    });
+                }
+                data.nodes.forEach(n => { if (depthOfNode[n.id] === undefined) depthOfNode[n.id] = 999; });
+
+                // Group by depth for ring placement
+                const ringGroups = {};
+                Object.entries(depthOfNode).forEach(([id, d]) => {
+                    if (!ringGroups[d]) ringGroups[d] = [];
+                    ringGroups[d].push(id);
+                });
+
+                // Place nodes on concentric rings — instant, no CPU-heavy layout
+                const containerW = container.offsetWidth;
+                const containerH = container.offsetHeight;
+                const cx = containerW / 2, cy_center = containerH / 2;
+                const ringSpacing = Math.min(containerW, containerH) / (Object.keys(ringGroups).length * 2 + 1);
+                const positions = {};
+                const sortedRings = Object.keys(ringGroups).map(Number).sort((a, b) => a - b);
+
+                sortedRings.forEach((depth, ringIdx) => {
+                    const ids = ringGroups[depth];
+                    const radius = ringIdx === 0 ? 0 : ringIdx * ringSpacing;
+                    ids.forEach((id, i) => {
+                        const angle = (2 * Math.PI * i) / ids.length - Math.PI / 2;
+                        positions[id] = {
+                            x: cx + radius * Math.cos(angle),
+                            y: cy_center + radius * Math.sin(angle)
+                        };
+                    });
+                });
+
+                // Clear the loader before initializing Cytoscape
+                container.innerHTML = '';
+
+                // ---- STEP 2: Create the real (visible) empty Cytoscape instance ----
+                const cy = cytoscape({
+                    container: container,
+                    elements: [],
+                    userZoomingEnabled: false,   // lock zoom during weaving
+                    userPanningEnabled: false,
+                    style: [
+                        {
+                            selector: 'node',
+                            style: {
+                                'shape': 'ellipse',
+                                'background-color': '#050608',
+                                'border-width': 2,
+                                'border-color': '#3b82f6',
+                                'border-style': 'dashed',
+                                'label': 'data(label)',
+                                'color': '#94a3b8',
+                                'font-size': '9px',
+                                'text-valign': 'bottom',
+                                'text-margin-y': 5,
+                                'shadow-blur': 10,
+                                'shadow-color': '#3b82f6',
+                                'width': ele => Math.max(15, Math.min(35, ele.data('val') * 5)),
+                                'height': ele => Math.max(15, Math.min(35, ele.data('val') * 5)),
+                                'transition-property': 'opacity',
+                                'transition-duration': '0.4s',
+                                'opacity': 0
+                            }
+                        },
+                        {
+                            selector: 'node[type="target"]',
+                            style: {
+                                'shape': 'hexagon',
+                                'background-color': '#0f172a',
+                                'border-width': 3,
+                                'border-color': '#3b82f6',
+                                'border-style': 'solid',
+                                'shadow-blur': 30,
+                                'shadow-color': '#3b82f6',
+                                'color': '#fff',
+                                'font-size': '11px',
+                                'width': 50,
+                                'height': 50
+                            }
+                        },
+                        {
+                            selector: 'node[type="mixer"]',
+                            style: {
+                                'shape': 'star',
+                                'background-color': '#450a0a',
+                                'border-width': 2,
+                                'border-color': '#ef4444',
+                                'border-style': 'solid',
+                                'shadow-blur': 20,
+                                'shadow-color': '#ef4444',
+                                'shadow-opacity': 0.9,
+                                'width': 40,
+                                'height': 40
+                            }
+                        },
+                        {
+                            selector: 'edge',
+                            style: {
+                                'width': 1,
+                                'line-color': 'rgba(59, 130, 246, 0.3)',
+                                'curve-style': 'unbundled-bezier',
+                                'control-point-distances': ele => (Math.random() * 60 - 30),
+                                'control-point-weights': ele => Math.random() * 0.4 + 0.3,
+                                'target-arrow-shape': 'triangle',
+                                'target-arrow-color': 'rgba(59, 130, 246, 0.3)',
+                                'arrow-scale': 0.6,
+                                'transition-property': 'opacity',
+                                'transition-duration': '0.4s',
+                                'opacity': 0
+                            }
+                        },
+                        // Permanently visible — added once revealed
+                        { selector: '.revealed', style: { 'opacity': 1 } },
+                        /* Interactive Hover Classes */
+                        { selector: '.dimmed', style: { 'opacity': 0.1 } },
+                        { selector: '.highlighted-node', style: { 'background-color': '#fff', 'border-color': '#fff', 'shadow-blur': 30, 'shadow-color': '#fff', 'opacity': 1 } },
+                        { selector: '.highlighted-edge', style: { 'line-color': '#fff', 'target-arrow-color': '#fff', 'width': 2, 'z-index': 10, 'opacity': 1 } }
+                    ]
+                });
+
+                // ---- STEP 3: Add ALL nodes instantly at their pre-calculated positions ----
+                const nodeEls = data.nodes.map(n => ({
+                    data: { id: n.id, label: n.label, type: n.type, val: n.value },
+                    position: positions[n.id] || { x: cx, y: cy_center }
+                }));
+                const edgeEls = data.edges.map(e => ({
+                    data: { id: e.source + '_' + e.target, source: e.source, target: e.target, weight: e.value }
+                }));
+                cy.add(nodeEls);
+                cy.add(edgeEls);
+
+                // Single fade-in for all elements at once
+                requestAnimationFrame(() => requestAnimationFrame(() => cy.elements().addClass('revealed')));
+
+                // Enable interactions immediately
+                cy.userZoomingEnabled(true);
+                cy.userPanningEnabled(true);
+
+                // --- THE MISSING INTERACTIVITY EVENT LISTENERS ---
+                cy.on('mouseover', 'node', function (evt) {
+                    const node = evt.target;
+                    // Only interact with visible nodes
+                    if (node.style('opacity') < 0.5) return;
+
+                    // Dim everything
+                    cy.elements().addClass('dimmed');
+
+                    // Highlight hovered node and its immediate connections
+                    node.removeClass('dimmed').addClass('highlighted-node');
+                    node.connectedEdges().removeClass('dimmed').addClass('highlighted-edge');
+                    node.connectedEdges().connectedNodes().removeClass('dimmed');
+
+                    // Show Tooltip
+                    const val = node.data('val') ? parseFloat(node.data('val')).toFixed(4) : "Unknown";
+                    tooltip.innerHTML = `
+                        <span class="tooltip-label">NODE: ${node.data('type').toUpperCase()}</span>
+                        <strong style="font-size:12px;">${node.data('id').substring(0, 16)}...</strong><br>
+                        <span style="color:var(--success); margin-top:5px; display:block;">Vol: ${val} ETH</span>
+                    `;
+                    tooltip.style.display = 'block';
+                });
+
+                cy.on('mousemove', function (evt) {
+                    // Make tooltip follow cursor
+                    tooltip.style.left = evt.renderedPosition.x + 'px';
+
+                    // Adjust Y position relative to the graph container
+                    const containerRect = container.getBoundingClientRect();
+                    tooltip.style.top = (evt.renderedPosition.y + containerRect.top - 20) + 'px';
+                });
+
+                cy.on('mouseout', 'node', function (evt) {
+                    // Reset styles and hide tooltip
+                    cy.elements().removeClass('dimmed highlighted-node highlighted-edge');
+                    tooltip.style.display = 'none';
+                });
+
+            } catch (e) {
+                container.innerHTML = `<div style="color:var(--danger); padding:20px; text-align:center;">Error: ${e.message}</div>`;
+            }
+        }
+
+        function reportAddress() {
+            const addr = document.getElementById('walletInput').value;
+            if (!addr) {
+                alert("No address selected to report.");
+                return;
+            }
+            document.getElementById('reportDescription').value = "";
+            document.getElementById('reportModal').style.display = 'flex';
+        }
+
+        function closeReportModal() {
+            document.getElementById('reportModal').style.display = 'none';
+        }
+
+        async function submitReport() {
+            const addr = document.getElementById('walletInput').value;
+            const scamType = document.getElementById('reportScamType').value;
+            const description = document.getElementById('reportDescription').value.trim();
+
+            if (description.length < 10) {
+                alert("Description must be at least 10 characters so our AI can verify your claim.");
+                return;
+            }
+
+            try {
+                const btn = document.querySelector('#reportModal .scan-btn');
+                const origText = btn.innerHTML;
+                btn.innerHTML = "SUBMITTING...";
+                btn.disabled = true;
+
+                const isLocal = window.location.protocol === 'file:' || window.location.port === '5500' || window.location.port === '5501';
+                const API_BASE = isLocal ? 'http://127.0.0.1:8001' : '';
+                const token = localStorage.getItem('crypto_token') || '';
+                const username = localStorage.getItem('crypto_user') || 'anonymous';
+                
+                const res = await fetch(`${API_BASE}/report`, { 
+                    method: 'POST', 
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    }, 
+                    body: JSON.stringify({ 
+                        address: addr, 
+                        reason: scamType + " report pending verification",
+                        username: username,
+                        scam_type: scamType,
+                        description: description
+                    }) 
+                });
+                
+                btn.innerHTML = origText;
+                btn.disabled = false;
+
+                if (res.ok) { 
+                    alert("Report Submitted Successfully. It is now pending AI verification."); 
+                    closeReportModal();
+                } else { 
+                    const err = await res.text();
+                    console.error("Report failed:", err);
+                    alert("Failed to report. Please check if you are logged in."); 
+                }
+            } catch (e) { 
+                alert("Error: " + e.message); 
+                document.querySelector('#reportModal .scan-btn').disabled = false;
+                document.querySelector('#reportModal .scan-btn').innerHTML = "SUBMIT REPORT";
+            }
+        }
+    </script>
+</body>
+
+</html>

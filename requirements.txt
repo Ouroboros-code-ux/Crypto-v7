@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+requests
+google-generativeai
+pydantic
+slowapi
+httpx
+bcrypt
+python-multipart
+python-jose
+sqlalchemy
+python-dotenv
+pandas
+numpy
+scikit-learn
+ecdsa
+gunicorn

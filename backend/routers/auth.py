@@ -1,0 +1,206 @@
+from datetime import datetime, timedelta
+import secrets
+import logging
+from fastapi import APIRouter, HTTPException, Depends
+from jose import jwt, JWTError
+from ..database import get_db
+from ..models import User
+from ..internal_types import LoginRequest, SignupRequest
+from ..config import (
+    SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES,
+    SMTP_SERVER, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, BASE_URL
+)
+from ..limiter import limiter
+from fastapi import Request
+from sqlalchemy.orm import Session
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+from fastapi.security import OAuth2PasswordBearer
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    credentials_exception = HTTPException(
+        status_code=401,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+        
+    user = db.query(User).filter(User.username == username).first()
+    if user is None:
+        raise credentials_exception
+    return user
+
+async def get_optional_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    """
+    Same as get_current_user but returns None instead of raising 401 if token is missing or invalid.
+    Used for honeypot/fake-block logic.
+    """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username:
+            return db.query(User).filter(User.username == username).first()
+    except:
+        pass
+    return None
+
+def create_access_token(data: dict, expires_delta: timedelta | None = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+
+router = APIRouter()
+logger = logging.getLogger(__name__)
+
+import bcrypt
+
+def verify_password(plain_password, hashed_password):
+    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password)
+
+def get_password_hash(password):
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+
+def send_verification_email(email: str, otp: str):
+    if not SMTP_USER or not SMTP_PASSWORD:
+        logger.warning(f"SMTP credentials missing. Email to {email} not sent. OTP: {otp}")
+        return False
+    
+    msg = MIMEMultipart()
+    msg['From'] = SMTP_USER
+    msg['To'] = email
+    msg['Subject'] = f"{otp} is your CryptoShield AI Verification Code"
+    
+    body = f"""
+    Hello,
+    
+    Thank you for registering with CryptoShield AI.
+    
+    Your verification code is:
+    
+    {otp}
+    
+    Please enter this code on the signup page to activate your account.
+    
+    If you did not sign up for an account, please ignore this email.
+    """
+    msg.attach(MIMEText(body, 'plain'))
+    
+    try:
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.send_message(msg)
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send verification email to {email}: {str(e)}")
+        return False
+
+@router.post("/login")
+@limiter.limit("10/minute")
+async def login(request: Request, credentials: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == credentials.username).first()
+
+    if user:
+        stored_pw = user.password
+        if isinstance(stored_pw, str):
+            stored_pw = stored_pw.encode('utf-8')
+            
+        if verify_password(credentials.password, stored_pw):
+            if user.is_verified == 1:
+                access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+                access_token = create_access_token(
+                    data={"sub": credentials.username}, expires_delta=access_token_expires
+                )
+                return {"message": "Login successful.", "token": access_token}
+            else:
+                raise HTTPException(status_code=403, detail="Email not verified.")
+        else:
+            raise HTTPException(status_code=401, detail="Invalid username or password.")
+    else:
+        raise HTTPException(status_code=401, detail="Invalid username or password.")
+
+@router.post("/signup")
+@limiter.limit("5/minute")
+async def signup(request: Request, user: SignupRequest, db: Session = Depends(get_db)):
+    # Generate 6-digit OTP
+    otp = "".join([str(secrets.randbelow(10)) for _ in range(6)])
+    hashed_password = get_password_hash(user.password)
+    
+    try:
+        new_user = User(
+            username=user.username,
+            password=hashed_password,
+            email=user.email,
+            is_verified=0,
+            verification_token=otp
+        )
+        db.add(new_user)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"User creation failed: {str(e)}")
+        raise HTTPException(status_code=400, detail="Username taken.")
+    
+    logger.info(f"Verification token for {user.email}: {otp}")
+    
+    # Send verification email
+    email_sent = send_verification_email(user.email, otp)
+    
+    if email_sent:
+        return {"message": "Account created. Please enter the 6-digit code sent to your email."}
+    else:
+        return {"message": "Account created, but we couldn't send the OTP. Please check server logs."}
+
+@router.post("/api/verify-otp")
+@limiter.limit("10/minute")
+async def verify_otp(request: Request, data: dict, db: Session = Depends(get_db)):
+    username = data.get("username")
+    otp = data.get("otp")
+    
+    user = db.query(User).filter(User.username == username, User.verification_token == otp).first()
+    
+    if user:
+        user.is_verified = 1
+        db.commit()
+        return {"message": "Email verified successfully."}
+    else:
+        raise HTTPException(status_code=400, detail="Invalid OTP code.")
+
+@router.get("/verify/{token}")
+@limiter.limit("10/minute")
+async def verify_email_page(request: Request, token: str):
+    """Web route to serve the verification page."""
+    from fastapi.responses import FileResponse
+    return FileResponse("Verify.html")
+
+@router.get("/api/verify/{token}")
+@limiter.limit("10/minute")
+async def verify_email_api(request: Request, token: str, db: Session = Depends(get_db)):
+    """API route used by the verification page."""
+    user = db.query(User).filter(User.verification_token == token).first()
+    
+    if user:
+        user.is_verified = 1
+        # Clear token after use if desired, or keep for record
+        # user.verification_token = None 
+        db.commit()
+        return {"message": "Email verified successfully."}
+    else:
+        raise HTTPException(status_code=400, detail="Invalid or expired token.")
