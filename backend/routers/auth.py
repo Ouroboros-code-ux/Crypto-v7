@@ -193,7 +193,10 @@ async def signup(request: Request, user: SignupRequest, db: Session = Depends(ge
     if email_sent:
         return {"message": "Account created. Please enter the 6-digit code sent to your email."}
     else:
-        return {"message": "Account created, but we couldn't send the OTP. Please check server logs."}
+        raise HTTPException(
+            status_code=500, 
+            detail="Account created, but we couldn't send the OTP email. Please check your SMTP settings in Render."
+        )
 
 @router.post("/api/verify-otp")
 @limiter.limit("10/minute")
