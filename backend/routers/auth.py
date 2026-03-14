@@ -79,8 +79,9 @@ def get_password_hash(password):
 
 def send_verification_email(email: str, otp: str):
     if not SMTP_USER or not SMTP_PASSWORD:
-        logger.warning(f"SMTP credentials missing. Email to {email} not sent. OTP: {otp}")
-        return False
+        err = "SMTP credentials missing in Environment Variables."
+        logger.warning(f"Email to {email} not sent: {err}")
+        return False, err
     
     msg = MIMEMultipart()
     msg['From'] = SMTP_USER
@@ -103,11 +104,16 @@ def send_verification_email(email: str, otp: str):
     msg.attach(MIMEText(body, 'plain'))
     
     try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=10) as server:
-            server.starttls()
-            server.login(SMTP_USER, SMTP_PASSWORD)
-            server.send_message(msg)
-        return True
+        if SMTP_PORT == 465:
+            with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, timeout=10) as server:
+                server.login(SMTP_USER, SMTP_PASSWORD)
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=10) as server:
+                server.starttls()
+                server.login(SMTP_USER, SMTP_PASSWORD)
+                server.send_message(msg)
+        return True, ""
     except Exception as e:
         error_msg = str(e)
         logger.error(f"Failed to send verification email to {email}: {error_msg}")
