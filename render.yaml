@@ -7,8 +7,6 @@ services:
     envVars:
       - key: DATABASE_URL
         value: sqlite:///./community_reports.db
-      - key: PORT
-        default: 8000
       - key: ADMIN_PASSWORD
         generateValue: true
       - key: SECRET_KEY
