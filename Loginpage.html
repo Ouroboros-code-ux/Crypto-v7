@@ -284,10 +284,17 @@
                     }, 500);
                 } else {
                     const data = await response.json();
-                    throw new Error(data.detail || "Authentication Failed");
+                    if (response.status === 403 && data.detail.includes("sign up again")) {
+                        errorDiv.innerHTML = `> Error: ${data.detail} <br><br>
+                        <a href="/register" style="color: var(--primary-accent); text-decoration: underline; cursor: pointer;">Go to Registration</a>`;
+                    } else {
+                        throw new Error(data.detail || "Authentication Failed");
+                    }
                 }
             } catch (err) {
-                errorDiv.innerText = "> Error: " + err.message;
+                if (!errorDiv.innerHTML.includes("Go to Registration")) {
+                    errorDiv.innerText = "> Error: " + err.message;
+                }
                 btn.disabled = false;
                 btn.innerText = "Initialize Session";
             }

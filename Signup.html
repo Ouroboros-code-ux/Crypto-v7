@@ -280,10 +280,17 @@
                     document.getElementById('otp-section').className = 'animate-in'; 
                     document.getElementById('otp-section').style.display = 'block';
                     
-                    statusDiv.innerHTML = `<div style="text-align: left; padding: 10px; border-left: 2px solid var(--success); background: rgba(16, 185, 129, 0.1); margin-top:10px;">
-                        <strong>Code Sent!</strong><br>
-                        Enter the 6-digit code sent to ${email}.
-                    </div>`;
+                    if (data.message && data.message.includes("resent")) {
+                        statusDiv.innerHTML = `<div style="text-align: left; padding: 10px; border-left: 2px solid var(--primary-accent); background: rgba(59, 130, 246, 0.1); margin-top:10px;">
+                            <strong>Code Resent!</strong><br>
+                            We found your pending registration. A new 6-digit code has been sent to ${email}.
+                        </div>`;
+                    } else {
+                        statusDiv.innerHTML = `<div style="text-align: left; padding: 10px; border-left: 2px solid var(--success); background: rgba(16, 185, 129, 0.1); margin-top:10px;">
+                            <strong>Code Sent!</strong><br>
+                            Enter the 6-digit code sent to ${email}.
+                        </div>`;
+                    }
                     statusDiv.className = 'success';
                 } else {
                     throw new Error(data.detail || "Registration Failed");

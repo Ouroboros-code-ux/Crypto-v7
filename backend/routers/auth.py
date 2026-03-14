@@ -130,7 +130,7 @@ async def login(request: Request, credentials: LoginRequest, db: Session = Depen
                 )
                 return {"message": "Login successful.", "token": access_token}
             else:
-                raise HTTPException(status_code=403, detail="Email not verified.")
+                raise HTTPException(status_code=403, detail="Email not verified. Please sign up again to resend code.")
         else:
             raise HTTPException(status_code=401, detail="Invalid username or password.")
     else:
@@ -139,6 +139,27 @@ async def login(request: Request, credentials: LoginRequest, db: Session = Depen
 @router.post("/signup")
 @limiter.limit("5/minute")
 async def signup(request: Request, user: SignupRequest, db: Session = Depends(get_db)):
+    # Check if user exists
+    existing_user = db.query(User).filter((User.username == user.username) | (User.email == user.email)).first()
+    
+    otp = "".join([str(secrets.randbelow(10)) for _ in range(6)])
+    hashed_password = get_password_hash(user.password)
+
+    if existing_user:
+        if existing_user.is_verified == 1:
+            raise HTTPException(status_code=400, detail="Account with this email or username already exists.")
+        else:
+            # User exists but is not verified. Update their OTP and resend.
+            existing_user.verification_token = otp
+            # Also update password just in case they used a new one
+            existing_user.password = hashed_password
+            db.commit()
+            
+            email_sent = send_verification_email(existing_user.email, otp)
+            if email_sent:
+                return {"message": "Verification code resent. Please check your email."}
+            else:
+                return {"message": "Account updated, but email sending failed. Check server logs."}
     # Generate 6-digit OTP
     otp = "".join([str(secrets.randbelow(10)) for _ in range(6)])
     hashed_password = get_password_hash(user.password)
@@ -188,6 +209,27 @@ async def verify_otp(request: Request, data: dict, db: Session = Depends(get_db)
         return {"message": "Email verified successfully."}
     else:
         raise HTTPException(status_code=400, detail="Invalid OTP code.")
+
+@router.post("/api/resend-otp")
+@limiter.limit("5/minute")
+async def resend_otp(request: Request, data: dict, db: Session = Depends(get_db)):
+    username = data.get("username")
+    user = db.query(User).filter(User.username == username).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    if user.is_verified == 1:
+        raise HTTPException(status_code=400, detail="Account is already verified.")
+        
+    otp = "".join([str(secrets.randbelow(10)) for _ in range(6)])
+    user.verification_token = otp
+    db.commit()
+    
+    email_sent = send_verification_email(user.email, otp)
+    if email_sent:
+        return {"message": "New verification code sent."}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to send email.")
 
 @router.get("/verify/{token}")
 @limiter.limit("10/minute")
