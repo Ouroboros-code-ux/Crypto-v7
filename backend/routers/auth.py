@@ -109,8 +109,9 @@ def send_verification_email(email: str, otp: str):
             server.send_message(msg)
         return True
     except Exception as e:
-        logger.error(f"Failed to send verification email to {email}: {str(e)}")
-        return False
+        error_msg = str(e)
+        logger.error(f"Failed to send verification email to {email}: {error_msg}")
+        return False, error_msg
 
 @router.post("/login")
 @limiter.limit("10/minute")
@@ -155,11 +156,14 @@ async def signup(request: Request, user: SignupRequest, db: Session = Depends(ge
             existing_user.password = hashed_password
             db.commit()
             
-            email_sent = send_verification_email(existing_user.email, otp)
+            email_sent, smtp_error = send_verification_email(existing_user.email, otp)
             if email_sent:
                 return {"message": "Verification code resent. Please check your email."}
             else:
-                return {"message": "Account updated, but email sending failed. Check server logs."}
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Found your account, but email failed: {smtp_error}. Please check your Render SMTP settings."
+                )
     # Generate 6-digit OTP
     otp = "".join([str(secrets.randbelow(10)) for _ in range(6)])
     hashed_password = get_password_hash(user.password)
@@ -188,14 +192,14 @@ async def signup(request: Request, user: SignupRequest, db: Session = Depends(ge
     logger.info(f"Verification token for {user.email}: {otp}")
     
     # Send verification email
-    email_sent = send_verification_email(user.email, otp)
+    email_sent, smtp_error = send_verification_email(user.email, otp)
     
     if email_sent:
         return {"message": "Account created. Please enter the 6-digit code sent to your email."}
     else:
         raise HTTPException(
             status_code=500, 
-            detail="Account created, but we couldn't send the OTP email. Please check your SMTP settings in Render."
+            detail=f"Account created, but email failed: {smtp_error}. Please check your Render Env Vars."
         )
 
 @router.post("/api/verify-otp")
@@ -228,11 +232,14 @@ async def resend_otp(request: Request, data: dict, db: Session = Depends(get_db)
     user.verification_token = otp
     db.commit()
     
-    email_sent = send_verification_email(user.email, otp)
+    email_sent, smtp_error = send_verification_email(user.email, otp)
     if email_sent:
         return {"message": "New verification code sent."}
     else:
-        raise HTTPException(status_code=500, detail="Failed to send email.")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Failed to send email: {smtp_error}. Check Render Env Vars."
+        )
 
 @router.get("/verify/{token}")
 @limiter.limit("10/minute")
