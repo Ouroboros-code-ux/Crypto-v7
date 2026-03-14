@@ -155,8 +155,14 @@ async def signup(request: Request, user: SignupRequest, db: Session = Depends(ge
         db.commit()
     except Exception as e:
         db.rollback()
-        logger.warning(f"User creation failed: {str(e)}")
-        raise HTTPException(status_code=400, detail="Username taken.")
+        error_msg = str(e)
+        logger.warning(f"User creation failed: {error_msg}")
+        if "UNIQUE constraint failed" in error_msg:
+            if "users.email" in error_msg:
+                raise HTTPException(status_code=400, detail="An account with this email already exists.")
+            else:
+                raise HTTPException(status_code=400, detail="Username is already taken.")
+        raise HTTPException(status_code=400, detail="Registration failed. Please try again.")
     
     logger.info(f"Verification token for {user.email}: {otp}")
     
