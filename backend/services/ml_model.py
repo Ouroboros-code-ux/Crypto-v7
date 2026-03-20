@@ -7,7 +7,6 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, accuracy_score
 import csv
 
-# 8 features — must stay in sync with prepare_real_data.py and analysis.py
 EXPECTED_COLS = [
     "tx_amount",
     "time_since_last_tx_seconds",
@@ -23,10 +22,7 @@ def train_model(
     dataset_path: str = "backend/data/transactions_dataset.csv",
     model_path: str   = "backend/data/fraud_model.pkl",
 ):
-    """
-    Trains a Random Forest classifier on the real Kaggle dataset
-    (or synthetic fallback) to detect fraudulent wallets.
-    """
+    
     print(f"Loading dataset from {dataset_path}...")
     try:
         df = pd.read_csv(dataset_path)
@@ -34,7 +30,6 @@ def train_model(
         print("Dataset not found! Please run prepare_real_data.py first.")
         return
 
-    # Drop rows that are missing any of our expected columns
     available = [c for c in EXPECTED_COLS if c in df.columns]
     missing   = [c for c in EXPECTED_COLS if c not in df.columns]
     if missing:
@@ -52,7 +47,7 @@ def train_model(
     )
 
     print("Training Random Forest Classifier (8 features)...")
-    # class_weight='balanced' is critical when fraud cases are a minority
+    
     clf = RandomForestClassifier(
         n_estimators=200,
         max_depth=12,
@@ -76,22 +71,17 @@ def train_model(
     ):
         print(f"  {col:35s}: {imp:.4f}")
 
-    # Save the model
     os.makedirs(os.path.dirname(model_path), exist_ok=True)
     with open(model_path, "wb") as f:
         pickle.dump(clf, f)
 
     print(f"\nModel saved successfully to {model_path}")
 
-
 def load_and_predict(
     features_dict: dict,
     model_path: str = "backend/data/fraud_model.pkl",
 ) -> float:
-    """
-    Loads the trained model and predicts the probability of fraud
-    for a single wallet's feature dict.
-    """
+    
     try:
         with open(model_path, "rb") as f:
             clf = pickle.load(f)
@@ -101,27 +91,21 @@ def load_and_predict(
 
     df = pd.DataFrame([features_dict])
 
-    # Fill any missing columns with 0 so prediction never crashes
     for col in EXPECTED_COLS:
         if col not in df.columns:
             df[col] = 0.0
 
     df = df[EXPECTED_COLS]
 
-    # Predict probability of class 1 (Fraud)
     prob = clf.predict_proba(df)[0][1]
     return float(prob)
-
 
 def append_feedback(
     features_dict: dict,
     ai_risk_score: int,
     dataset_path: str = "backend/data/transactions_dataset.csv",
 ):
-    """
-    Learns from Gemini API analysis by appending its conclusion back to
-    the dataset. Generates is_fraud label based on the ai_risk_score.
-    """
+    
     is_fraud = 1 if ai_risk_score >= 50 else 0
 
     row_data = [features_dict.get(col, 0.0) for col in EXPECTED_COLS]
@@ -141,7 +125,6 @@ def append_feedback(
         )
     except Exception as e:
         print(f"Failed to append ML feedback: {e}")
-
 
 if __name__ == "__main__":
     train_model()

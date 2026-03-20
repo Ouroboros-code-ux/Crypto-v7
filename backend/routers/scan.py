@@ -11,7 +11,6 @@ from ..services.analysis import analyze_wallet
 from ..services.graph import build_graph_data
 
 from .auth import get_optional_user
-from ..services.honeypot import generate_fake_scan_result
 
 router = APIRouter()
 scan_cache = {}
@@ -19,10 +18,6 @@ scan_cache = {}
 @router.get("/scan")
 @limiter.limit("5/minute")
 def scan_address(request: Request, address: str, db: Session = Depends(get_db), current_user = Depends(get_optional_user)):
-    # --- FAKE BLOCK / HONEYPOT LOGIC ---
-    # if not current_user:
-    #     return generate_fake_scan_result(address)
-    # -----------------------------------
 
     if not address or not re.match(r"^0x[a-fA-F0-9]{40}$", address):
         raise HTTPException(status_code=400, detail="Invalid Ethereum address format")
@@ -49,14 +44,6 @@ def scan_address(request: Request, address: str, db: Session = Depends(get_db), 
 @router.get("/graph")
 @limiter.limit("5/minute")
 def get_graph_data(request: Request, address: str, chain: str = "ETH", current_user = Depends(get_optional_user)):
-    # --- FAKE BLOCK / HONEYPOT LOGIC ---
-    # if not current_user:
-    #     # Return a small, generic graph for unauthenticated users
-    #     return {
-    #         "nodes": [{"id": address, "label": "Target", "type": "target", "value": 1}],
-    #         "edges": []
-    #     }
-    # -----------------------------------
 
     if not address or not re.match(r"^0x[a-fA-F0-9]{40}$", address):
          raise HTTPException(status_code=400, detail="Invalid Ethereum address")

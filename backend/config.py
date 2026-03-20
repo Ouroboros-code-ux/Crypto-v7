@@ -5,7 +5,6 @@ try:
 except ImportError:
     pass 
 
-
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./community_reports.db")
 DB_NAME = "community_reports.db" 
 
@@ -17,7 +16,6 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
 SMTP_USER = os.getenv("SMTP_USER")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 BASE_URL = os.getenv("BASE_URL", "http://localhost:8001")
-
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:

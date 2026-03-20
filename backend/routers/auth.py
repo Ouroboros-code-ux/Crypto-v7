@@ -41,10 +41,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     return user
 
 async def get_optional_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    """
-    Same as get_current_user but returns None instead of raising 401 if token is missing or invalid.
-    Used for honeypot/fake-block logic.
-    """
+    
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
@@ -64,7 +61,6 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
-
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -146,7 +142,7 @@ async def login(request: Request, credentials: LoginRequest, db: Session = Depen
 @router.post("/signup")
 @limiter.limit("5/minute")
 async def signup(request: Request, user: SignupRequest, db: Session = Depends(get_db)):
-    # Check if user exists
+    
     existing_user = db.query(User).filter((User.username == user.username) | (User.email == user.email)).first()
     
     otp = "".join([str(secrets.randbelow(10)) for _ in range(6)])
@@ -156,21 +152,24 @@ async def signup(request: Request, user: SignupRequest, db: Session = Depends(ge
         if existing_user.is_verified == 1:
             raise HTTPException(status_code=400, detail="Account with this email or username already exists.")
         else:
-            # User exists but is not verified. Update their OTP and resend.
+            
             existing_user.verification_token = otp
-            # Also update password just in case they used a new one
+            
             existing_user.password = hashed_password
             db.commit()
             
             email_sent, smtp_error = send_verification_email(existing_user.email, otp)
             if email_sent:
-                return {"message": "Verification code resent. Please check your email."}
+                return {
+                    "message": "Verification code resent. Please check your email.",
+                    "username": existing_user.username
+                }
             else:
                 raise HTTPException(
                     status_code=500,
                     detail=f"Found your account, but email failed: {smtp_error}. Please check your Render SMTP settings."
                 )
-    # Generate 6-digit OTP
+    
     otp = "".join([str(secrets.randbelow(10)) for _ in range(6)])
     hashed_password = get_password_hash(user.password)
     
@@ -197,7 +196,6 @@ async def signup(request: Request, user: SignupRequest, db: Session = Depends(ge
     
     logger.info(f"Verification token for {user.email}: {otp}")
     
-    # Send verification email
     email_sent, smtp_error = send_verification_email(user.email, otp)
     
     if email_sent:
@@ -212,9 +210,12 @@ async def signup(request: Request, user: SignupRequest, db: Session = Depends(ge
 @limiter.limit("10/minute")
 async def verify_otp(request: Request, data: dict, db: Session = Depends(get_db)):
     username = data.get("username")
-    otp = data.get("otp")
+    otp = str(data.get("otp", "")).strip()
     
-    user = db.query(User).filter(User.username == username, User.verification_token == otp).first()
+    user = db.query(User).filter(
+        (User.username == username) | (User.email == username),
+        User.verification_token == otp
+    ).first()
     
     if user:
         user.is_verified = 1
@@ -250,20 +251,19 @@ async def resend_otp(request: Request, data: dict, db: Session = Depends(get_db)
 @router.get("/verify/{token}")
 @limiter.limit("10/minute")
 async def verify_email_page(request: Request, token: str):
-    """Web route to serve the verification page."""
+    
     from fastapi.responses import FileResponse
     return FileResponse("Verify.html")
 
 @router.get("/api/verify/{token}")
 @limiter.limit("10/minute")
 async def verify_email_api(request: Request, token: str, db: Session = Depends(get_db)):
-    """API route used by the verification page."""
+    
     user = db.query(User).filter(User.verification_token == token).first()
     
     if user:
         user.is_verified = 1
-        # Clear token after use if desired, or keep for record
-        # user.verification_token = None 
+        
         db.commit()
         return {"message": "Email verified successfully."}
     else:

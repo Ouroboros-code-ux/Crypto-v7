@@ -31,8 +31,6 @@ def build_graph_data(target_address: str, chain: str = "ETH") -> GraphResponse:
 
     level1_txs = fetch_chain_history(target_address, chain)
 
-    # Collapse all raw transactions into per-partner aggregates first.
-    # Key: partner_address -> {"value": float, "direction": "IN"|"OUT", "n_type": str, "label": str}
     partner_agg: Dict[str, dict] = {}
 
     print(f"Analyzing {len(level1_txs)} L1 transactions (capped at top 50 partners)...")
@@ -58,9 +56,9 @@ def build_graph_data(target_address: str, chain: str = "ETH") -> GraphResponse:
 
             if partner not in partner_agg:
                 partner_agg[partner] = {"value": 0.0, "direction": direction,
-                                        "n_type": n_type, "label": label}
+                                        : n_type, "label": label}
             partner_agg[partner]["value"] += val
-            # If the partner both sent and received, mark as partner (more neutral)
+            
             if partner_agg[partner]["direction"] != direction:
                 partner_agg[partner]["direction"] = "BOTH"
 
@@ -69,7 +67,6 @@ def build_graph_data(target_address: str, chain: str = "ETH") -> GraphResponse:
         except Exception as e:
             logger.warning(f"Unexpected error processing L1 transaction: {e}")
 
-    # Render only the TOP 50 partners by total value for graph performance
     MAX_GRAPH_PARTNERS = 50
     top_partners = sorted(partner_agg.items(), key=lambda x: x[1]["value"], reverse=True)[:MAX_GRAPH_PARTNERS]
 
@@ -84,7 +81,6 @@ def build_graph_data(target_address: str, chain: str = "ETH") -> GraphResponse:
         if info["n_type"] != "mixer":
             partners[partner] = info["value"]
 
-    # Deep-trace only top 2 highest-value non-mixer partners
     sorted_partners = sorted(partners.items(), key=lambda x: x[1], reverse=True)[:2]
     
     print(f"Deep Tracing Top Partners: {[p[0] for p in sorted_partners]}")

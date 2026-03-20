@@ -1,7 +1,7 @@
 import json
 import logging
 import sqlite3
-import google.generativeai as genai
+from google import genai
 from typing import List, Optional, Tuple
 
 from ..config import DB_NAME, GEMINI_API_KEY, MIXER_ADDRESSES
@@ -12,7 +12,7 @@ import time
 logger = logging.getLogger(__name__)
 
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+    client = genai.Client(api_key=GEMINI_API_KEY)
 
 def find_rapid_outs(transactions: List[dict], address: str) -> bool:
     if not transactions:
@@ -126,7 +126,6 @@ def analyze_wallet(address: str, transactions: List[dict], chain: str, db: Optio
 
     peeling_detected = find_rapid_outs(transactions, address)
 
-    # Calculate ML Features (8 features — must match ml_model.py EXPECTED_COLS)
     avg_tx_amount = (total_in + total_out) / (tx_count if tx_count > 0 else 1)
 
     time_since_last = 0
@@ -140,11 +139,9 @@ def analyze_wallet(address: str, transactions: List[dict], chain: str, db: Optio
 
     in_out_ratio = (total_in / total_out) if total_out > 0 else total_in
 
-    # Count direction-split transaction counts
     sent_tnx     = sum(1 for tx in clean_txs if tx["direction"] == "OUT")
     received_tnx = sum(1 for tx in clean_txs if tx["direction"] == "IN")
 
-    # Time span between first and last transaction in minutes
     time_diff_mins = (last_tx_time - first_tx_time) / 60.0 if clean_txs else 0.0
 
     ml_features = {
@@ -158,7 +155,6 @@ def analyze_wallet(address: str, transactions: List[dict], chain: str, db: Optio
         "time_diff_mins":             time_diff_mins,
     }
 
-    # 1. Run ML Prediction
     fraud_prob = load_and_predict(ml_features)
     risk_score = int(fraud_prob * 100)
     risk_factors = []
@@ -173,11 +169,13 @@ def analyze_wallet(address: str, transactions: List[dict], chain: str, db: Optio
          risk_factors.append(f"Local ML Model detected suspicious patterns ({risk_score}%).")
 
     if tornado_interactions:
-        # Mixer interaction is still a solid heuristic flag
+        
         risk_score = max(risk_score, 75)
         risk_factors.append("Interacted with crypto mixers")
 
-    if risk_factors:
+    if GEMINI_API_KEY:
+        explanation = "Local heuristics suggest: " + ("; ".join(risk_factors) if risk_factors else f"the wallet is generally safe, scoring it at {risk_score}%.") + " (AI analysis in progress...)"
+    elif risk_factors:
         explanation = f"AI Service Unavailable. Local ML Detection: {'; '.join(risk_factors)} Note: This is an automatically generated static heuristic analysis."
     else:
         explanation = f"AI Service Unavailable. The local ML model evaluated the transaction parameters and predicted this wallet is generally safe, scoring it at {risk_score}%."
@@ -186,10 +184,10 @@ def analyze_wallet(address: str, transactions: List[dict], chain: str, db: Optio
     if risk_score > 75: risk_level = "HIGH RISK"
     elif risk_score > 40: risk_level = "WARNING"
 
-    # 2. Gemini Explanation (Optional Fallback / Enhancer)
     if GEMINI_API_KEY:
         try:
-            model = genai.GenerativeModel('gemini-flash-latest')
+            
+            model_id = 'gemini-1.5-flash'
             
             prompt = f"""
             Analyze this {chain} wallet: {address}
@@ -212,14 +210,20 @@ def analyze_wallet(address: str, transactions: List[dict], chain: str, db: Optio
             Provide a more detailed risk assessment and explanation.
             
             Return JSON:
-            {{
+            { 
                 "risk_score": (int 0-100, you can adjust the heuristic score),
                 "risk_level": "(SAFE, WARNING, HIGH RISK)",
                 "explanation": "concise, professional summary"
-            }}
+            } 
             """
             
-            result = model.generate_content(prompt, generation_config={"response_mime_type": "application/json"})
+            result = client.models.generate_content(
+                model=model_id,
+                contents=prompt, 
+                config={
+                    "response_mime_type": "application/json"
+                }
+            )
             ai_data = json.loads(result.text)
             
             if ai_data.get("risk_score") is not None:
@@ -232,12 +236,13 @@ def analyze_wallet(address: str, transactions: List[dict], chain: str, db: Optio
             if ai_data.get("risk_level"):
                 risk_level = ai_data.get("risk_level")
                 
-            # ML Feedback Loop execution
             logger.info(f"Appending Gemini feedback to dataset. Original local ML={fraud_prob*100:.2f}%, Gemini={ai_score}%")
             append_feedback(ml_features, ai_score)
 
         except Exception as e:
             logger.error(f"AI Analysis failed: {e}")
+            if GEMINI_API_KEY:
+                explanation = explanation.replace(" (AI analysis in progress...)", " (AI Analysis failed, results based on local ML).")
 
     return ScanResponse(
         address=address, 

@@ -280,6 +280,10 @@
                     document.getElementById('otp-section').className = 'animate-in'; 
                     document.getElementById('otp-section').style.display = 'block';
                     
+                    if (data.username) {
+                        registeredUsername = data.username;
+                    }
+
                     if (data.message && data.message.includes("resent")) {
                         statusDiv.innerHTML = `<div style="text-align: left; padding: 10px; border-left: 2px solid var(--primary-accent); background: rgba(59, 130, 246, 0.1); margin-top:10px;">
                             <strong>Code Resent!</strong><br>
@@ -304,7 +308,8 @@
         });
 
         document.getElementById('verifyOtpBtn').addEventListener('click', async () => {
-            const otp = document.getElementById('otp-input').value;
+            let otp = document.getElementById('otp-input').value;
+            otp = otp.trim();
             const statusDiv = document.getElementById('status-msg');
             const btn = document.getElementById('verifyOtpBtn');
 
