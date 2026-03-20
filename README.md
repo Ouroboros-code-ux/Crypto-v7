@@ -1,5 +1,7 @@
 # 🛡️ CryptoShield.AI: Advanced Blockchain Fraud Detection
 
+![Project Demo](Demo.mp4)
+
 **CryptoShield.AI** is a high-performance web application designed to protect crypto users by analyzing wallet history for malicious patterns, money laundering, and fraud using a multi-layered detection engine.
 
 ---
