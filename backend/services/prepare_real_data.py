@@ -30,8 +30,8 @@ def prepare_data():
 
     tx_col = None
     for candidate in [
-        ,
-        ,
+        "Total Transactions",
+        "total transactions",
     ]:
         if candidate in df.columns:
             tx_col = candidate
@@ -57,15 +57,15 @@ def prepare_data():
     df["is_fraud"] = df["FLAG"].astype(int)
 
     model_cols = [
-        ,
-        ,
-        ,
-        ,
-        ,
-        ,
-        ,
-        ,
-        ,
+        "tx_amount",
+        "time_since_last_tx_seconds",
+        "degree_centrality",
+        "historical_tx_count",
+        "in_out_ratio",
+        "sent_tnx",
+        "received_tnx",
+        "time_diff_mins",
+        "is_fraud",
     ]
 
     out = df[model_cols].dropna()

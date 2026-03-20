@@ -35,12 +35,12 @@ def generate_dataset(num_samples: int = 5000, output_path: str = "transactions_d
             in_out_ratio = random.uniform(0.1, 5.0) 
             
         row = {
-            : round(tx_amount, 4),
-            : time_since_last_tx,
-            : degree_centrality,
-            : historical_tx_count,
-            : round(in_out_ratio, 4),
-            : is_fraud
+            "tx_amount": round(tx_amount, 4),
+            "time_since_last_tx_seconds": time_since_last_tx,
+            "degree_centrality": degree_centrality,
+            "historical_tx_count": historical_tx_count,
+            "in_out_ratio": round(in_out_ratio, 4),
+            "is_fraud": is_fraud
         }
         data.append(row)
         

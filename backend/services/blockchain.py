@@ -13,15 +13,15 @@ class ChainProvider:
         logger.debug(f"Fetching data for {address} on {chain}...")
         
         params = {
-            : "account",
-            : "txlist",
-            : address,
-            : 0,
-            : 99999999,
-            : 1,
-            : 1000,
-            : "desc",
-            : ETHERSCAN_API_KEY
+            "module": "account",
+            "action": "txlist",
+            "address": address,
+            "startblock": 0,
+            "endblock": 99999999,
+            "page": 1,
+            "offset": 1000,
+            "sort": "desc",
+            "apikey": ETHERSCAN_API_KEY
         }
         
         if chain == "POLYGON":

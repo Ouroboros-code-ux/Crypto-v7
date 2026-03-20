@@ -56,7 +56,7 @@ def build_graph_data(target_address: str, chain: str = "ETH") -> GraphResponse:
 
             if partner not in partner_agg:
                 partner_agg[partner] = {"value": 0.0, "direction": direction,
-                                        : n_type, "label": label}
+                                        "n_type": n_type, "label": label}
             partner_agg[partner]["value"] += val
             
             if partner_agg[partner]["direction"] != direction:

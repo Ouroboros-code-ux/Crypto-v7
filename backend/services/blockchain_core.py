@@ -15,18 +15,18 @@ class Transaction:
 
     def to_dict(self) -> Dict:
         return {
-            : self.sender,
-            : self.recipient,
-            : self.amount,
-            : self.signature
+            "sender": self.sender,
+            "recipient": self.recipient,
+            "amount": self.amount,
+            "signature": self.signature
         }
         
     def hash_tx(self) -> str:
         
         tx_dict = {
-            : self.sender,
-            : self.recipient,
-            : self.amount,
+            "sender": self.sender,
+            "recipient": self.recipient,
+            "amount": self.amount,
         }
         tx_string = json.dumps(tx_dict, sort_keys=True).encode()
         return hashlib.sha256(tx_string).hexdigest()
@@ -58,23 +58,23 @@ class Block:
     def get_hash(self) -> str:
         
         block_dict = {
-            : self.index,
-            : self.timestamp,
-            : [tx.to_dict() for tx in self.transactions],
-            : self.proof,
-            : self.previous_hash
+            "index": self.index,
+            "timestamp": self.timestamp,
+            "transactions": [tx.to_dict() for tx in self.transactions],
+            "proof": self.proof,
+            "previous_hash": self.previous_hash
         }
         block_string = json.dumps(block_dict, sort_keys=True).encode()
         return hashlib.sha256(block_string).hexdigest()
         
     def to_dict(self) -> Dict:
         return {
-            : self.index,
-            : self.timestamp,
-            : [tx.to_dict() for tx in self.transactions],
-            : self.proof,
-            : self.previous_hash,
-            : self.get_hash()
+            "index": self.index,
+            "timestamp": self.timestamp,
+            "transactions": [tx.to_dict() for tx in self.transactions],
+            "proof": self.proof,
+            "previous_hash": self.previous_hash,
+            "hash": self.get_hash()
         }
 
 class Blockchain:
@@ -180,6 +180,6 @@ class Blockchain:
         sk = ecdsa.SigningKey.generate(curve=ecdsa.SECP256k1)
         vk = sk.get_verifying_key()
         return {
-            : sk.to_string().hex(),
-            : vk.to_string().hex() 
+            "private_key": sk.to_string().hex(),
+            "public_key": vk.to_string().hex() 
         }

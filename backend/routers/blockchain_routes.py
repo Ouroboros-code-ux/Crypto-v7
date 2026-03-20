@@ -27,8 +27,8 @@ class NodeRegisterRequest(BaseModel):
 def get_chain():
     
     response = {
-        : [block.to_dict() for block in blockchain.chain],
-        : len(blockchain.chain),
+        "chain": [block.to_dict() for block in blockchain.chain],
+        "length": len(blockchain.chain),
     }
     return response
 
@@ -64,11 +64,11 @@ def mine(current_user = Depends(get_current_user)):
     block = blockchain.new_block(proof, previous_hash)
 
     response = {
-        : "New Block Forged",
-        : block.index,
-        : [tx.to_dict() for tx in block.transactions],
-        : block.proof,
-        : block.previous_hash,
+        "message": "New Block Forged",
+        "index": block.index,
+        "transactions": [tx.to_dict() for tx in block.transactions],
+        "proof": block.proof,
+        "previous_hash": block.previous_hash,
     }
     return response
 
